@@ -32,8 +32,8 @@ resource "aws_key_pair" "generated_key" {
 
 
 resource "local_sensitive_file" "private_key" {
-  content = tls_private_key.example.private_key_pem
-  filename          = "${path.module}/generated-key.pem"
+  content  = tls_private_key.example.private_key_pem
+  filename = "${path.module}/generated-key.pem"
 }
 
 # -------------------------------------------------------------------------------
@@ -75,7 +75,7 @@ module "ec2_security_group" {
   egress_rules       = ["all-all"]
 }
 
-module ec2_connect_role_policy {
+module "ec2_connect_role_policy" {
   source  = "terraform-aws-modules/iam/aws//modules/iam-assumable-role"
   version = "~> 3.7.0"
 
@@ -84,6 +84,38 @@ module ec2_connect_role_policy {
   create_role             = true
   create_instance_profile = true
 
-  trusted_role_services   = ["ec2.amazonaws.com"]
-  custom_role_policy_arns = ["arn:aws:iam::aws:policy/EC2InstanceConnect", "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"]
+  trusted_role_services = ["ec2.amazonaws.com"]
+  custom_role_policy_arns = [
+    "arn:aws:iam::aws:policy/EC2InstanceConnect",
+    "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore",
+    aws_iam_policy.ec2_s3_access_policy.arn
+  ]
+}
+
+locals {
+  bucket_name = "myvisausa-public-images-bucket"
+}
+
+resource "aws_iam_policy" "ec2_s3_access_policy" {
+  name        = "EC2S3AccessPolicy"
+  description = "Policy allowing EC2 instance access to S3 bucket"
+
+  policy = <<EOF
+    {
+      "Version": "2012-10-17",
+      "Statement": [
+        {
+          "Effect": "Allow",
+          "Action": [
+            "s3:GetObject",
+            "s3:PutObject",
+            "s3:ListBucket"
+          ],
+          "Resource": [
+            "arn:aws:s3:::${local.bucket_name}"
+          ]
+        }
+      ]
+    }
+  EOF
 }
